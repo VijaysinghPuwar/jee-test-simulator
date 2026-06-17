@@ -57,11 +57,27 @@ App runs at `http://localhost:3000`.
 
 ## Deploy to Vercel
 
+> **You MUST set all five env vars in Vercel before the app will work.** If any are missing the home page will show a "Setup required" screen and `/api/auth/*` will return `500` with `[next-auth][error][NO_SECRET]`.
+
 1. Push this repo to GitHub.
 2. https://vercel.com/new → import the repo.
-3. In Vercel → Project → Settings → Environment Variables, add all five vars above (set `NEXTAUTH_URL` to the deployed URL).
-4. Add the production redirect URI in Google Cloud (step 3 above).
-5. Deploy.
+3. In **Vercel → Project → Settings → Environment Variables**, add all five vars:
+   - `NEXTAUTH_SECRET` — `openssl rand -base64 32`
+   - `NEXTAUTH_URL` — your full deployed URL, e.g. `https://jee-test-simulator.vercel.app`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `ENCRYPTION_KEY` — `openssl rand -hex 32` (must be 64 hex chars)
+   - Apply each to **Production** (and Preview if you preview deploys).
+4. Add the production redirect URI in Google Cloud:
+   `https://<your-vercel-domain>/api/auth/callback/google`
+5. **Redeploy** (Vercel does not auto-redeploy on env-var change — trigger a new deploy from the Deployments tab or push a commit).
+6. Verify by visiting `/api/health` — should return `{ "ok": true }` once env is correct.
+
+### Troubleshooting
+
+- `[next-auth][error][NO_SECRET]` in Vercel logs → `NEXTAUTH_SECRET` is missing. Set it and redeploy.
+- `/api/health` returns 503 with a `missing` array → those env vars are unset.
+- Sign-in redirects back to `/signin?error=Configuration` → either `NEXTAUTH_URL` is wrong or the Google redirect URI doesn't match exactly.
 
 Notes for Vercel:
 - API routes use `runtime = "nodejs"` and `maxDuration = 60` (Pro tier). On Hobby, drop to `10`.
