@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Dropzone from "@/components/Dropzone";
 import NavBar from "@/components/NavBar";
-import { extractPdfText } from "@/lib/pdf-extract";
+import {
+  extractPdfContent,
+  type ExtractedPdfPage,
+} from "@/lib/pdf-extract";
 import {
   deleteSavedPaper,
   readSavedPapers,
@@ -49,6 +52,18 @@ function formatSavedDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function pageImagePayload(pages: ExtractedPdfPage[]) {
+  return pages
+    .filter((page): page is ExtractedPdfPage & { imageDataUrl: string } =>
+      Boolean(page.imageDataUrl)
+    )
+    .map((page) => ({
+      pageNumber: page.pageNumber,
+      text: page.text,
+      dataUrl: page.imageDataUrl,
+    }));
 }
 
 export default function UploadPage() {
@@ -119,6 +134,8 @@ export default function UploadPage() {
       setStage("extracting");
       let questionPaperText: string;
       let answerKeyText: string;
+      let questionPaperPageImages: ReturnType<typeof pageImagePayload> = [];
+      let answerKeyPageImages: ReturnType<typeof pageImagePayload> = [];
       let paperTitle: string;
       let sourceFiles: string[];
 
@@ -126,18 +143,27 @@ export default function UploadPage() {
         const file = combinedFile as File;
         paperTitle = fileBaseName(file.name);
         sourceFiles = [file.name];
-        setProgress("Extracting combined question and answer PDF text…");
-        questionPaperText = await extractPdfText(file);
+        setProgress("Extracting combined PDF text and page images…");
+        const questionPaper = await extractPdfContent(file, {
+          includePageImages: true,
+        });
+        questionPaperText = questionPaper.text;
+        questionPaperPageImages = pageImagePayload(questionPaper.pages);
         answerKeyText = COMBINED_ANSWER_KEY_NOTE;
       } else {
         const questionFile = qpFile as File;
         const keyFile = akFile as File;
         paperTitle = fileBaseName(questionFile.name);
         sourceFiles = [questionFile.name, keyFile.name];
-        setProgress("Extracting Question Paper text…");
-        questionPaperText = await extractPdfText(questionFile);
+        setProgress("Extracting Question Paper text and page images…");
+        const questionPaper = await extractPdfContent(questionFile, {
+          includePageImages: true,
+        });
+        questionPaperText = questionPaper.text;
+        questionPaperPageImages = pageImagePayload(questionPaper.pages);
         setProgress("Extracting Answer Key text…");
-        answerKeyText = await extractPdfText(keyFile);
+        const answerKey = await extractPdfContent(keyFile);
+        answerKeyText = answerKey.text;
       }
 
       setStage("parsing");
@@ -151,6 +177,8 @@ export default function UploadPage() {
           testType: "JEE_MAIN",
           questionPaperText,
           answerKeyText,
+          questionPaperPageImages,
+          answerKeyPageImages,
         }),
       });
 

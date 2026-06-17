@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { loadKey } from "@/lib/key-store";
 import { parseWithProvider } from "@/lib/providers";
+import {
+  pickSubjectPageImages,
+  type PageImageInput,
+} from "@/lib/providers/image-input";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   ParseRequestSchema,
@@ -44,12 +48,42 @@ function extractJsonArray(raw: string): unknown {
   throw new Error("Model output did not contain a JSON array");
 }
 
+function isPlaceholderOption(option: string): boolean {
+  const normalized = option.trim();
+  return /^(\(?[1-4]\)?|[A-D]|option\s*[1-4A-D]?)$/i.test(normalized);
+}
+
+function normalizedQuestionText(text: string): string {
+  return text
+    .replace(/Only One Option Correct Type/gi, "")
+    .replace(/Each question has multiple options out of which ONLY ONE is correct\.?/gi, "")
+    .replace(/Question No\.?\s*\d+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isWeakQuestion(q: ValidatedQuestion): boolean {
+  const text = normalizedQuestionText(q.questionText);
+  if (text.length < 24) return true;
+  if (/^(single correct|numerical type|section[-\s]?[i1]+)$/i.test(text)) {
+    return true;
+  }
+  if (q.type === "mcq") {
+    if (!q.options || q.options.length !== 4) return true;
+    const meaningfulOptions = q.options.filter((o) => !isPlaceholderOption(o));
+    if (meaningfulOptions.length < 2) return true;
+  }
+  return false;
+}
+
 async function parseSubject(
   provider: Provider,
   apiKey: string,
   qp: string,
   ak: string,
-  subject: Subject
+  subject: Subject,
+  questionPaperPageImages: PageImageInput[],
+  answerKeyPageImages: PageImageInput[]
 ): Promise<ValidatedQuestion[]> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), PER_CALL_TIMEOUT_MS);
@@ -58,6 +92,8 @@ async function parseSubject(
     raw = await parseWithProvider(provider, apiKey, {
       questionPaperText: qp,
       answerKeyText: ak,
+      questionPaperPageImages,
+      answerKeyPageImages,
       subject,
       signal: ac.signal,
     });
@@ -71,7 +107,14 @@ async function parseSubject(
       validated.error.issues[0]?.message ?? "schema validation failed"
     );
   }
-  return validated.data.filter((q) => q.subject === subject);
+  const questions = validated.data.filter((q) => q.subject === subject);
+  const weak = questions.filter(isWeakQuestion);
+  if (questions.length < 20 || weak.length > 2) {
+    throw new Error(
+      `Parsed ${subject} questions are incomplete (${questions.length} total, ${weak.length} weak). Reparse with a vision-capable provider and page images enabled.`
+    );
+  }
+  return questions;
 }
 
 export async function POST(req: Request) {
@@ -116,6 +159,8 @@ export async function POST(req: Request) {
 
   const qp = parsed.data.questionPaperText;
   const ak = parsed.data.answerKeyText;
+  const qpImages = parsed.data.questionPaperPageImages ?? [];
+  const akImages = parsed.data.answerKeyPageImages ?? [];
   const provider = stored.provider;
   const apiKey = stored.apiKey;
 
@@ -130,12 +175,16 @@ export async function POST(req: Request) {
 
       const tasks = SUBJECTS.map(async (subject) => {
         try {
+          const subjectQuestionImages = pickSubjectPageImages(qpImages, subject);
+          const subjectAnswerImages = pickSubjectPageImages(akImages, subject);
           const questions = await parseSubject(
             provider,
             apiKey,
             qp,
             ak,
-            subject
+            subject,
+            subjectQuestionImages,
+            subjectAnswerImages
           );
           send({
             type: "chunk",

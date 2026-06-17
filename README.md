@@ -2,7 +2,7 @@
 
 A secure, BYOK (Bring-Your-Own-Key) NTA-style JEE Main computer-based test simulator.
 
-Upload either one combined question-and-answer PDF or separate question paper + answer key PDFs, parse them with the LLM provider of your choice (Anthropic Claude, OpenAI, or Google Gemini), and take a full timed test with a real exam interface.
+Upload either one combined question-and-answer PDF or separate question paper + answer key PDFs, parse them with the vision-capable LLM provider of your choice (Anthropic Claude, OpenAI, or Google Gemini), and take a full timed test with a real exam interface.
 
 ## Stack
 
@@ -19,6 +19,7 @@ Upload either one combined question-and-answer PDF or separate question paper + 
 - **Auth gate.** Every API route requires a valid NextAuth session. Unauthenticated requests return `401`. Middleware also redirects `/exam`, `/results`, `/settings` to `/signin`.
 - **BYOK with server-side decryption.** Provider API keys are encrypted server-side with AES-256-GCM, stored in an httpOnly + secure + sameSite=strict cookie, and decrypted in memory per request. Keys are never sent to the client and never logged.
 - **Constrained server payload.** `/api/parse` accepts a fixed structured payload (`testType`, `questionPaperText`, `answerKeyText`). It is **not** an open passthrough to any provider — no arbitrary prompt or model is accepted.
+- **Vision fallback for PDFs.** The browser renders compressed question-paper page images and sends the relevant subject pages to the selected provider so formulas, diagrams, symbols, and image-heavy PDFs can be transcribed more reliably.
 - **Rate limiting.** `/api/parse` is rate-limited per user (10 req / 60 s). On Vercel serverless, the in-memory limiter is per-instance — for production, swap `lib/rate-limit.ts` for Upstash Redis.
 - **Input validation.** Uploads are checked client-side for MIME, size (≤ 10 MB), and PDF magic bytes (`%PDF-`). Extracted text is capped at 180 KB before being sent to the model.
 - **Output validation.** Model output is `JSON.parse`d inside try/catch and validated against a Zod schema before use — never `eval`. Bad output returns `502`.
@@ -93,7 +94,7 @@ Notes for Vercel:
    - OpenAI: `platform.openai.com` (model: `gpt-4.1-mini`)
    - Gemini: `aistudio.google.com` (model: `gemini-2.0-flash`)
 3. From the home page, choose **Separate PDFs** or **One combined PDF**.
-4. Upload the PDF source and click **Parse PDFs**. A successful parse is saved automatically.
+4. Upload the PDF source and click **Parse PDFs**. A successful parse is saved automatically. For image-heavy PDFs, use a provider/model with vision support.
 5. Click **Start Test**, or later use **Saved Question Papers** → **Start** without uploading again.
 6. Take the test (3 hr · 75 Q · Maths / Physics / Chemistry · +4 / −1).
 7. Submit to see your subject-wise score, charts, and per-question review.
@@ -130,7 +131,7 @@ middleware.ts               withAuth gate for /exam, /results, /settings
 
 ## Caveats
 
-- **Math/equation fidelity.** `pdfjs-dist` text extraction can garble integrals, subscripts, chemical structures. For best results use papers exported as digital PDFs (not scans). A future vision-based parser would handle math better at higher cost.
+- **Math/equation fidelity.** The app sends compressed page images to the provider for vision-assisted parsing and renders LaTeX with KaTeX. Very low-resolution scans or complex chemical structure images may still need a stronger provider/model or a cleaner PDF.
 - **Rate limit on serverless.** The in-memory limiter does not share state across Vercel function instances. Acceptable for personal use; swap to Upstash Redis if you open the app to others.
 - **Single-key per user.** Only one provider key is stored at a time; saving a new one replaces it.
 

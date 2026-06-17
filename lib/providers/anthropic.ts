@@ -4,6 +4,7 @@ import {
   SYSTEM_PROMPT_BASE,
   subjectSystemPrompt,
 } from "./prompt";
+import { pageImageContext, parseImageDataUrl } from "./image-input";
 import type { ParseFn } from "./index";
 
 const MODEL = "claude-sonnet-4-6";
@@ -13,6 +14,47 @@ export const parseWithAnthropic: ParseFn = async (input, apiKey) => {
   const system = input.subject
     ? subjectSystemPrompt(input.subject)
     : SYSTEM_PROMPT_BASE;
+  const questionPages = input.questionPaperPageImages ?? [];
+  const answerPages = input.answerKeyPageImages ?? [];
+  const content: Array<Record<string, unknown>> = [
+    {
+      type: "text",
+      text: buildUserPrompt(
+        input.questionPaperText,
+        input.answerKeyText,
+        input.subject,
+        pageImageContext(questionPages, answerPages)
+      ),
+    },
+  ];
+  for (const page of questionPages) {
+    const image = parseImageDataUrl(page.dataUrl);
+    content.push(
+      { type: "text", text: `Question paper page ${page.pageNumber}` },
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mediaType,
+          data: image.base64,
+        },
+      }
+    );
+  }
+  for (const page of answerPages) {
+    const image = parseImageDataUrl(page.dataUrl);
+    content.push(
+      { type: "text", text: `Answer key / solutions page ${page.pageNumber}` },
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mediaType,
+          data: image.base64,
+        },
+      }
+    );
+  }
   const msg = await client.messages.create(
     {
       model: MODEL,
@@ -21,11 +63,7 @@ export const parseWithAnthropic: ParseFn = async (input, apiKey) => {
       messages: [
         {
           role: "user",
-          content: buildUserPrompt(
-            input.questionPaperText,
-            input.answerKeyText,
-            input.subject
-          ),
+          content: content as never,
         },
       ],
     },

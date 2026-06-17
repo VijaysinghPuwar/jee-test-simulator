@@ -1,5 +1,6 @@
 "use client";
 
+import MathText from "@/components/MathText";
 import type { AnswerState, Question } from "@/lib/types";
 
 interface QuestionViewProps {
@@ -39,7 +40,7 @@ export default function QuestionView({
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-800 dark:text-slate-200">
-          {question.questionText}
+          <MathText text={question.questionText} />
         </div>
 
         {question.type === "mcq" && question.options && (
@@ -68,7 +69,7 @@ export default function QuestionView({
                       <span className="mr-2 font-mono text-slate-500 dark:text-slate-400">
                         ({value})
                       </span>
-                      {opt}
+                      <MathText text={opt} />
                     </span>
                   </label>
                 </li>

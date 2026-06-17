@@ -8,6 +8,7 @@ import {
   ResponseDonut,
   SubjectScoreBar,
 } from "@/components/ResultsCharts";
+import MathText from "@/components/MathText";
 import NavBar from "@/components/NavBar";
 
 export default function ResultsPage() {
@@ -159,7 +160,7 @@ export default function ResultsPage() {
                     <StatusPill status={status} marks={r.marks} />
                   </div>
                   <div className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-sm text-slate-800">
-                    {r.question.questionText}
+                    <MathText text={r.question.questionText} />
                   </div>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs">
                     <div>
@@ -171,7 +172,11 @@ export default function ResultsPage() {
                     <div>
                       <span className="text-slate-500">Correct: </span>
                       <span className="font-mono text-green-700">
-                        {r.question.correctAnswer || "—"}
+                        {r.question.correctAnswer ? (
+                          <MathText text={r.question.correctAnswer} />
+                        ) : (
+                          "—"
+                        )}
                       </span>
                     </div>
                   </div>

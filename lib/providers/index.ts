@@ -3,10 +3,13 @@ import type { Subject } from "@/lib/types";
 import { parseWithAnthropic } from "./anthropic";
 import { parseWithOpenAI } from "./openai";
 import { parseWithGemini } from "./gemini";
+import type { PageImageInput } from "./image-input";
 
 export interface ParseInput {
   questionPaperText: string;
   answerKeyText: string;
+  questionPaperPageImages?: PageImageInput[];
+  answerKeyPageImages?: PageImageInput[];
   subject?: Subject;
   signal?: AbortSignal;
 }
