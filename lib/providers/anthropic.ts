@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   buildUserPrompt,
   SYSTEM_PROMPT_BASE,
+  subjectSectionSystemPrompt,
   subjectSystemPrompt,
 } from "./prompt";
 import type { ParseFn } from "./index";
@@ -10,13 +11,16 @@ const MODEL = "claude-sonnet-4-6";
 
 export const parseWithAnthropic: ParseFn = async (input, apiKey) => {
   const client = new Anthropic({ apiKey });
-  const system = input.subject
-    ? subjectSystemPrompt(input.subject)
-    : SYSTEM_PROMPT_BASE;
+  const system =
+    input.subject && input.section
+      ? subjectSectionSystemPrompt(input.subject, input.section)
+      : input.subject
+        ? subjectSystemPrompt(input.subject)
+        : SYSTEM_PROMPT_BASE;
   const msg = await client.messages.create(
     {
       model: MODEL,
-      max_tokens: input.subject ? 6000 : 16000,
+      max_tokens: input.section ? 4000 : input.subject ? 6000 : 16000,
       system,
       messages: [
         {
@@ -24,7 +28,8 @@ export const parseWithAnthropic: ParseFn = async (input, apiKey) => {
           content: buildUserPrompt(
             input.questionPaperText,
             input.answerKeyText,
-            input.subject
+            input.subject,
+            input.section
           ),
         },
       ],

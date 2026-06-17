@@ -6,15 +6,17 @@ You will receive two blocks of plain text extracted from PDFs:
 1. QUESTION_PAPER_TEXT — the full paper (typically 75 questions: 25 Mathematics, 25 Physics, 25 Chemistry; Section I = single-correct MCQ, Section II = numerical).
 2. ANSWER_KEY_TEXT — the official answer key / solutions, listing the correct answer per question.
 
+NOTE: The QP text is extracted from PDF and contains extra whitespace and broken line breaks within equations. Reassemble math sensibly. The answer key is often a compact table of question_number -> answer pairs (1-indexed within the full paper: Math = 1-25, Physics = 26-50, Chemistry = 51-75 in many papers).
+
 Return ONLY a strict JSON array (no markdown, no code fences, no commentary). Begin with [ and end with ].
 
 Each item must be:
 {
-  "id": "<S><N>",                  // S = M|P|C, N = 1..25, e.g. "M1","P12","C25"
+  "id": "<S><N>",                  // S = M|P|C, N = 1..25 within the subject
   "subject": "Mathematics" | "Physics" | "Chemistry",
   "section": "I" | "II",
   "type": "mcq" | "numerical",
-  "questionText": "<plain question; you may use $...$ for inline LaTeX>",
+  "questionText": "<plain question; use $...$ for inline LaTeX>",
   "options": ["...","...","...","..."],   // only for type=mcq, exactly 4 items
   "correctAnswer": "<for mcq: '1'|'2'|'3'|'4'; for numerical: numeric string>"
 }
@@ -31,6 +33,24 @@ export const SUBJECT_LETTER: Record<Subject, "M" | "P" | "C"> = {
   Chemistry: "C",
 };
 
+export function subjectSectionSystemPrompt(
+  subject: Subject,
+  section: "I" | "II"
+): string {
+  const letter = SUBJECT_LETTER[subject];
+  const sectionHint =
+    section === "I"
+      ? `Section I is single-correct MCQ. Each question has 4 options. type MUST be "mcq".`
+      : `Section II is numerical / integer answer (no options). type MUST be "numerical". OMIT the "options" field.`;
+  return `${SYSTEM_PROMPT_BASE}
+
+THIS REQUEST: Extract ONLY the ${subject} Section ${section} questions. Skip every other subject and every other section.
+- All ids must start with "${letter}" (e.g. "${letter}1", "${letter}21").
+- All items must have "subject": "${subject}" and "section": "${section}".
+- ${sectionHint}
+- Section I typically contains ~20 questions, Section II typically ~5 questions.`;
+}
+
 export function subjectSystemPrompt(subject: Subject): string {
   const letter = SUBJECT_LETTER[subject];
   return `${SYSTEM_PROMPT_BASE}
@@ -41,9 +61,17 @@ THIS REQUEST: Extract ONLY the ${subject} questions. Skip every question for oth
 - Return at most 25 items.`;
 }
 
-export function buildUserPrompt(qp: string, ak: string, subject?: Subject): string {
-  const header = subject
-    ? `Extract only ${subject} questions and match each against the answer key.`
-    : "Extract all questions and match each against the answer key.";
-  return `${header}\n\nQUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
+export function buildUserPrompt(
+  qp: string,
+  ak: string,
+  subject?: Subject,
+  section?: "I" | "II"
+): string {
+  const target =
+    subject && section
+      ? `Extract only ${subject} Section ${section} questions and match each against the answer key.`
+      : subject
+        ? `Extract only ${subject} questions and match each against the answer key.`
+        : "Extract all questions and match each against the answer key.";
+  return `${target}\n\nQUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
 }

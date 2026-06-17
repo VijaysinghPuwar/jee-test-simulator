@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import {
   buildUserPrompt,
   SYSTEM_PROMPT_BASE,
+  subjectSectionSystemPrompt,
   subjectSystemPrompt,
 } from "./prompt";
 import type { ParseFn } from "./index";
@@ -10,9 +11,12 @@ const MODEL = "gpt-4.1-mini";
 
 export const parseWithOpenAI: ParseFn = async (input, apiKey) => {
   const client = new OpenAI({ apiKey });
-  const system = input.subject
-    ? subjectSystemPrompt(input.subject)
-    : SYSTEM_PROMPT_BASE;
+  const system =
+    input.subject && input.section
+      ? subjectSectionSystemPrompt(input.subject, input.section)
+      : input.subject
+        ? subjectSystemPrompt(input.subject)
+        : SYSTEM_PROMPT_BASE;
   const res = await client.chat.completions.create(
     {
       model: MODEL,
@@ -27,7 +31,8 @@ export const parseWithOpenAI: ParseFn = async (input, apiKey) => {
           content: buildUserPrompt(
             input.questionPaperText,
             input.answerKeyText,
-            input.subject
+            input.subject,
+            input.section
           ),
         },
       ],

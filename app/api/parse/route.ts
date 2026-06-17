@@ -18,8 +18,21 @@ export const dynamic = "force-dynamic";
 
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
-const PER_SUBJECT_TIMEOUT_MS = 50_000;
-const SUBJECTS: Subject[] = ["Mathematics", "Physics", "Chemistry"];
+const PER_CALL_TIMEOUT_MS = 55_000;
+
+interface Chunk {
+  subject: Subject;
+  section: "I" | "II";
+}
+
+const CHUNKS: Chunk[] = [
+  { subject: "Mathematics", section: "I" },
+  { subject: "Mathematics", section: "II" },
+  { subject: "Physics", section: "I" },
+  { subject: "Physics", section: "II" },
+  { subject: "Chemistry", section: "I" },
+  { subject: "Chemistry", section: "II" },
+];
 
 function extractJsonArray(raw: string): unknown {
   let text = raw.trim();
@@ -44,21 +57,22 @@ function extractJsonArray(raw: string): unknown {
   throw new Error("Model output did not contain a JSON array");
 }
 
-async function parseSubject(
+async function parseChunk(
   provider: Provider,
   apiKey: string,
   qp: string,
   ak: string,
-  subject: Subject
+  chunk: Chunk
 ): Promise<ValidatedQuestion[]> {
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), PER_SUBJECT_TIMEOUT_MS);
+  const t = setTimeout(() => ac.abort(), PER_CALL_TIMEOUT_MS);
   let raw: string;
   try {
     raw = await parseWithProvider(provider, apiKey, {
       questionPaperText: qp,
       answerKeyText: ak,
-      subject,
+      subject: chunk.subject,
+      section: chunk.section,
       signal: ac.signal,
     });
   } finally {
@@ -68,12 +82,14 @@ async function parseSubject(
   const validated = QuestionsArraySchema.safeParse(parsed);
   if (!validated.success) {
     throw new Error(
-      `Schema validation failed for ${subject}: ${
+      `Schema validation failed: ${
         validated.error.issues[0]?.message ?? "unknown"
       }`
     );
   }
-  return validated.data.filter((q) => q.subject === subject);
+  return validated.data.filter(
+    (q) => q.subject === chunk.subject && q.section === chunk.section
+  );
 }
 
 export async function POST(req: Request) {
@@ -120,19 +136,19 @@ export async function POST(req: Request) {
   const ak = parsed.data.answerKeyText;
 
   const settled = await Promise.allSettled(
-    SUBJECTS.map((s) => parseSubject(stored.provider, stored.apiKey, qp, ak, s))
+    CHUNKS.map((c) => parseChunk(stored.provider, stored.apiKey, qp, ak, c))
   );
 
   const all: ValidatedQuestion[] = [];
-  const errors: { subject: Subject; error: string }[] = [];
+  const errors: { subject: Subject; section: "I" | "II"; error: string }[] = [];
   settled.forEach((r, i) => {
-    const subject = SUBJECTS[i];
+    const chunk = CHUNKS[i];
     if (r.status === "fulfilled") {
       all.push(...r.value);
     } else {
       const message =
         r.reason instanceof Error ? r.reason.message : String(r.reason);
-      errors.push({ subject, error: message });
+      errors.push({ ...chunk, error: message });
     }
   });
 
@@ -140,8 +156,12 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "All subjects failed to parse. " +
-          errors.map((e) => `${e.subject}: ${e.error}`).join(" | "),
+          `All ${stored.provider} calls failed. ` +
+          errors
+            .map((e) => `${e.subject} §${e.section}: ${e.error}`)
+            .slice(0, 3)
+            .join(" | "),
+        provider: stored.provider,
       },
       { status: 502 }
     );
@@ -161,6 +181,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     questions: validated.data,
+    provider: stored.provider,
     partial: errors.length > 0 ? errors : undefined,
   });
 }

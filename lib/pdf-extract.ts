@@ -63,7 +63,12 @@ export async function extractPdfText(file: File): Promise<string> {
       if (typeof y === "number") prevY = y;
     }
     if (current.trim()) lines.push(current.trim());
-    pages.push(`--- Page ${i} ---\n${lines.join("\n")}`);
+    const cleaned = lines
+      .map((l) => l.replace(/[ \t]{2,}/g, " ").trim())
+      .filter((l) => l.length > 0)
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n");
+    pages.push(`--- Page ${i} ---\n${cleaned}`);
     page.cleanup();
     if (pages.join("\n\n").length > MAX_EXTRACT_LENGTH) break;
   }

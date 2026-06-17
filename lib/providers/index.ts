@@ -8,6 +8,7 @@ export interface ParseInput {
   questionPaperText: string;
   answerKeyText: string;
   subject?: Subject;
+  section?: "I" | "II";
   signal?: AbortSignal;
 }
 

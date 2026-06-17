@@ -61,13 +61,13 @@ export default function UploadPage() {
         const body = await res.json().catch(() => ({}));
         const msg =
           res.status === 504
-            ? "Provider took too long to respond (timeout). Try a faster model (e.g. Gemini 2.0 Flash) or smaller PDFs."
+            ? "Provider hit the function timeout. If you're on OpenAI, switch to Gemini 2.0 Flash in Settings — it's significantly faster for this kind of structured extraction."
             : body.error || `Parse failed: ${res.status}`;
         throw new Error(msg);
       }
       const data = (await res.json()) as {
         questions: unknown[];
-        partial?: { subject: string; error: string }[];
+        partial?: { subject: string; section?: string; error: string }[];
       };
       const questions = data.questions as Parameters<typeof setQuestions>[0];
       if (!questions || questions.length === 0) {
@@ -76,7 +76,7 @@ export default function UploadPage() {
       setQuestions(questions);
       setStage("ready");
       const partial = data.partial?.length
-        ? ` (${data.partial.map((p) => p.subject).join(", ")} failed — partial result)`
+        ? ` (${data.partial.map((p) => `${p.subject}${p.section ? " §" + p.section : ""}`).join(", ")} failed — partial result)`
         : "";
       setProgress(`Extracted ${questions.length} questions${partial}`);
     } catch (e) {

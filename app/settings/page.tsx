@@ -8,7 +8,7 @@ type Provider = "anthropic" | "openai" | "gemini";
 const PROVIDER_LABELS: Record<Provider, string> = {
   anthropic: "Anthropic — claude-sonnet-4-6",
   openai: "OpenAI — gpt-4.1-mini",
-  gemini: "Google — gemini-2.0-flash",
+  gemini: "Google — gemini-2.0-flash  (recommended: fastest)",
 };
 
 interface StoredKey {
