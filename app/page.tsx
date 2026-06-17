@@ -249,7 +249,7 @@ export default function UploadPage() {
 
       if (okCount === 0) {
         throw new Error(
-          `All subjects failed${lastErr ? `: ${lastErr}` : ""}. Try switching to Gemini in Settings.`
+          `All subjects failed${lastErr ? `: ${lastErr}` : ""}. Try OpenAI / ChatGPT API, Anthropic Claude, or Gemini in Settings with a valid provider key.`
         );
       }
       setStage("ready");

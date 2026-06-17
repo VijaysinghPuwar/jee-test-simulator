@@ -2,7 +2,7 @@
 
 A secure, BYOK (Bring-Your-Own-Key) NTA-style JEE Main computer-based test simulator.
 
-Upload either one combined question-and-answer PDF or separate question paper + answer key PDFs, parse them with the vision-capable LLM provider of your choice (Anthropic Claude, OpenAI, or Google Gemini), and take a full timed test with a real exam interface.
+Upload either one combined question-and-answer PDF or separate question paper + answer key PDFs, parse them with the vision-capable LLM provider of your choice (OpenAI / ChatGPT API, Anthropic Claude, or Google Gemini), and take a full timed test with a real exam interface.
 
 ## Stack
 
@@ -90,9 +90,9 @@ Notes for Vercel:
 
 1. Sign in with Google.
 2. Go to **Settings**, pick a provider, paste your API key, **Save**.
-   - Anthropic: `console.anthropic.com` (model: `claude-sonnet-4-6`)
-   - OpenAI: `platform.openai.com` (model: `gpt-4.1-mini`)
-   - Gemini: `aistudio.google.com` (model: `gemini-2.0-flash`)
+   - OpenAI / ChatGPT API: `platform.openai.com` (model: `gpt-4.1-mini`)
+   - Anthropic Claude API: `console.anthropic.com` (model: `claude-sonnet-4-6`)
+   - Google Gemini API: `aistudio.google.com` (model: `gemini-2.0-flash`)
 3. From the home page, choose **Separate PDFs** or **One combined PDF**.
 4. Upload the PDF source and click **Parse PDFs**. A successful parse is saved automatically. For image-heavy PDFs, use a provider/model with vision support.
 5. Click **Start Test**, or later use **Saved Question Papers** → **Start** without uploading again.

@@ -6,9 +6,23 @@ import NavBar from "@/components/NavBar";
 type Provider = "anthropic" | "openai" | "gemini";
 
 const PROVIDER_LABELS: Record<Provider, string> = {
-  anthropic: "Anthropic — claude-sonnet-4-6",
-  openai: "OpenAI — gpt-4.1-mini",
-  gemini: "Google — gemini-2.0-flash  (recommended: fastest)",
+  openai: "OpenAI / ChatGPT API",
+  anthropic: "Anthropic Claude API",
+  gemini: "Google Gemini API",
+};
+
+const PROVIDER_DETAILS: Record<Provider, string> = {
+  openai:
+    "Use an OpenAI platform key from platform.openai.com. This is the ChatGPT API provider path.",
+  anthropic:
+    "Use an Anthropic Console key from console.anthropic.com for Claude.",
+  gemini: "Use a Google AI Studio key from aistudio.google.com for Gemini.",
+};
+
+const PROVIDER_MODELS: Record<Provider, string> = {
+  openai: "Default model: gpt-4.1-mini",
+  anthropic: "Default model: claude-sonnet-4-6",
+  gemini: "Default model: gemini-2.0-flash",
 };
 
 interface StoredKey {
@@ -17,7 +31,7 @@ interface StoredKey {
 }
 
 export default function SettingsPage() {
-  const [provider, setProvider] = useState<Provider>("anthropic");
+  const [provider, setProvider] = useState<Provider>("openai");
   const [apiKey, setApiKey] = useState("");
   const [stored, setStored] = useState<StoredKey | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,9 +104,10 @@ export default function SettingsPage() {
               Provider & API Key
             </h1>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Choose your provider and enter your API key. Keys are encrypted
-              with AES-256-GCM on the server and bound to your session. They are
-              only used to make your own parsing requests.
+              Choose OpenAI / ChatGPT API, Anthropic Claude, or Google Gemini
+              and enter that provider's API key. Keys are encrypted with
+              AES-256-GCM on the server and bound to your session. They are only
+              used to make your own parsing requests.
             </p>
           </header>
 
@@ -134,10 +149,16 @@ export default function SettingsPage() {
                     >
                       {Object.entries(PROVIDER_LABELS).map(([k, v]) => (
                         <option key={k} value={k}>
-                          {v}
+                          {v} · {PROVIDER_MODELS[k as Provider]}
                         </option>
                       ))}
                     </select>
+                    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                      <div className="font-medium text-slate-800 dark:text-slate-100">
+                        {PROVIDER_MODELS[provider]}
+                      </div>
+                      <div className="mt-0.5">{PROVIDER_DETAILS[provider]}</div>
+                    </div>
                   </div>
 
                   <div>
@@ -184,10 +205,9 @@ export default function SettingsPage() {
           </section>
 
           <p className="mt-4 text-xs text-slate-500">
-            Anthropic API keys at{" "}
-            <code>console.anthropic.com</code>, OpenAI at{" "}
-            <code>platform.openai.com</code>, Gemini at{" "}
-            <code>aistudio.google.com</code>.
+            OpenAI / ChatGPT API keys at <code>platform.openai.com</code>,
+            Anthropic Claude keys at <code>console.anthropic.com</code>, Gemini
+            keys at <code>aistudio.google.com</code>.
           </p>
         </div>
       </main>
