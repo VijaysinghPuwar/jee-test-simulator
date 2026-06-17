@@ -33,45 +33,22 @@ export const SUBJECT_LETTER: Record<Subject, "M" | "P" | "C"> = {
   Chemistry: "C",
 };
 
-export function subjectSectionSystemPrompt(
-  subject: Subject,
-  section: "I" | "II"
-): string {
-  const letter = SUBJECT_LETTER[subject];
-  const sectionHint =
-    section === "I"
-      ? `Section I is single-correct MCQ. Each question has 4 options. type MUST be "mcq".`
-      : `Section II is numerical / integer answer (no options). type MUST be "numerical". OMIT the "options" field.`;
-  return `${SYSTEM_PROMPT_BASE}
-
-THIS REQUEST: Extract ONLY the ${subject} Section ${section} questions. Skip every other subject and every other section.
-- All ids must start with "${letter}" (e.g. "${letter}1", "${letter}21").
-- All items must have "subject": "${subject}" and "section": "${section}".
-- ${sectionHint}
-- Section I typically contains ~20 questions, Section II typically ~5 questions.`;
-}
-
 export function subjectSystemPrompt(subject: Subject): string {
   const letter = SUBJECT_LETTER[subject];
   return `${SYSTEM_PROMPT_BASE}
 
-THIS REQUEST: Extract ONLY the ${subject} questions. Skip every question for other subjects.
-- All ids must start with "${letter}" (e.g. "${letter}1" .. "${letter}25").
-- All items must have "subject": "${subject}".
-- Return at most 25 items.`;
+THIS REQUEST: Extract ONLY ${subject} questions (skip every question for other subjects).
+You MUST return EXACTLY 25 question objects for ${subject}:
+  - 20 in Section I (single-correct MCQ, ids ${letter}1..${letter}20, each with 4 options)
+  - 5 in Section II (numerical, ids ${letter}21..${letter}25, NO options field)
+- Every item must have "subject": "${subject}" and id starting with "${letter}".
+- If a question is unclear, still emit a stub: keep the id, set "questionText" to your best guess, set "correctAnswer" to "" if uncertain.
+- Do NOT skip questions. Do NOT stop early. Return all 25 items.`;
 }
 
-export function buildUserPrompt(
-  qp: string,
-  ak: string,
-  subject?: Subject,
-  section?: "I" | "II"
-): string {
-  const target =
-    subject && section
-      ? `Extract only ${subject} Section ${section} questions and match each against the answer key.`
-      : subject
-        ? `Extract only ${subject} questions and match each against the answer key.`
-        : "Extract all questions and match each against the answer key.";
-  return `${target}\n\nQUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
+export function buildUserPrompt(qp: string, ak: string, subject?: Subject): string {
+  const header = subject
+    ? `Extract ALL 25 ${subject} questions and match each against the answer key.`
+    : "Extract all 75 questions and match each against the answer key.";
+  return `${header}\n\nQUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
 }

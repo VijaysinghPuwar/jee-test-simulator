@@ -40,14 +40,14 @@ export default function ResultsPage() {
   return (
     <>
       <NavBar />
-      <main className="min-h-[calc(100vh-3.5rem)] bg-slate-50">
+      <main className="min-h-[calc(100vh-3.5rem)] bg-slate-50 dark:bg-slate-950">
       <div className="mx-auto max-w-5xl px-6 py-10">
         <header className="mb-8 flex items-center justify-between">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-brand-600">
+            <div className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-500">
               Test Result
             </div>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
               JEE Main · Performance Summary
             </h1>
           </div>
@@ -56,7 +56,7 @@ export default function ResultsPage() {
               reset();
               router.push("/");
             }}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             Take Another Test
           </button>
@@ -88,8 +88,8 @@ export default function ResultsPage() {
           </ChartCard>
         </section>
 
-        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-800">Subject-wise</h2>
+        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Subject-wise</h2>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -133,8 +133,8 @@ export default function ResultsPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-800">
+        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             Question-by-Question Review
           </h2>
           <div className="mt-4 space-y-3">
@@ -201,15 +201,15 @@ function ScoreCard({
     <div
       className={`rounded-xl border p-4 shadow-sm ${
         accent === "brand"
-          ? "border-brand-200 bg-brand-50"
-          : "border-slate-200 bg-white"
+          ? "border-brand-200 bg-brand-50 dark:border-brand-800/60 dark:bg-brand-600/10"
+          : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
       }`}
     >
-      <div className="text-xs font-medium uppercase tracking-wider text-slate-500">
+      <div className="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </div>
-      <div className="mt-1 text-2xl font-semibold text-slate-900">{value}</div>
-      <div className="mt-0.5 text-xs text-slate-500">{sub}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+      <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{sub}</div>
     </div>
   );
 }
@@ -222,8 +222,8 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-2 text-sm font-semibold text-slate-800">{title}</div>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
       {children}
     </div>
   );

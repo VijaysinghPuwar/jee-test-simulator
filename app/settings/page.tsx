@@ -80,23 +80,23 @@ export default function SettingsPage() {
   return (
     <>
       <NavBar />
-      <main className="min-h-screen bg-slate-50">
+      <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
         <div className="mx-auto max-w-2xl px-6 py-10">
           <header className="mb-8">
-            <div className="text-xs font-medium uppercase tracking-wider text-brand-600">
+            <div className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-500">
               Settings
             </div>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+            <h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Provider & API Key
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               Choose your provider and enter your API key. Keys are encrypted
               with AES-256-GCM on the server and bound to your session. They are
               only used to make your own parsing requests.
             </p>
           </header>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             {loading ? (
               <div className="text-sm text-slate-500">Loading…</div>
             ) : (
@@ -124,13 +124,13 @@ export default function SettingsPage() {
 
                 <form onSubmit={save} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
                       Provider
                     </label>
                     <select
                       value={provider}
                       onChange={(e) => setProvider(e.target.value as Provider)}
-                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     >
                       {Object.entries(PROVIDER_LABELS).map(([k, v]) => (
                         <option key={k} value={k}>
@@ -141,7 +141,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-600">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
                       API Key
                     </label>
                     <input
@@ -156,7 +156,7 @@ export default function SettingsPage() {
                             ? "sk-…"
                             : "AI…"
                       }
-                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     />
                   </div>
 

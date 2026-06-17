@@ -34,8 +34,8 @@ export default function Dropzone({
       onClick={() => inputRef.current?.click()}
       className={`group flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-8 text-center transition cursor-pointer ${
         isOver
-          ? "border-brand-600 bg-brand-50"
-          : "border-slate-300 hover:border-brand-500 hover:bg-slate-50"
+          ? "border-brand-600 bg-brand-50 dark:bg-brand-600/10"
+          : "border-slate-300 hover:border-brand-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-brand-500 dark:hover:bg-slate-800/50"
       }`}
     >
       <input
@@ -45,14 +45,14 @@ export default function Dropzone({
         className="hidden"
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
       />
-      <div className="text-sm font-medium text-slate-700">{label}</div>
+      <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</div>
       {file ? (
-        <div className="text-xs text-slate-500">
-          <div className="font-medium text-slate-800">{file.name}</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="font-medium text-slate-800 dark:text-slate-100">{file.name}</div>
           <div>{(file.size / 1024).toFixed(0)} KB</div>
         </div>
       ) : (
-        <div className="text-xs text-slate-400">
+        <div className="text-xs text-slate-400 dark:text-slate-500">
           Click or drop a PDF here
         </div>
       )}

@@ -10,6 +10,8 @@ import type {
 } from "./types";
 import { JEE_MAIN_CONFIG } from "./types";
 
+type ParseStatus = "idle" | "streaming" | "complete" | "error";
+
 interface ExamStore {
   questions: Question[];
   answers: Record<string, AnswerState>;
@@ -18,8 +20,11 @@ interface ExamStore {
   config: ExamConfig;
   startedAt: number | null;
   submittedAt: number | null;
+  parseStatus: ParseStatus;
 
   setQuestions: (qs: Question[]) => void;
+  addQuestions: (qs: Question[]) => void;
+  setParseStatus: (s: ParseStatus) => void;
   startExam: () => void;
   setCurrentSubject: (s: Subject) => void;
   setCurrentQuestion: (id: string) => void;
@@ -30,6 +35,27 @@ interface ExamStore {
   visit: (id: string) => void;
   submitExam: () => void;
   reset: () => void;
+}
+
+const SUBJECT_ORDER: Record<Subject, number> = {
+  Mathematics: 0,
+  Physics: 1,
+  Chemistry: 2,
+};
+
+function idNumeric(id: string): number {
+  const m = id.match(/\d+/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
+function sortQuestions(qs: Question[]): Question[] {
+  return [...qs].sort((a, b) => {
+    const s = SUBJECT_ORDER[a.subject] - SUBJECT_ORDER[b.subject];
+    if (s !== 0) return s;
+    const sec = (a.section === "I" ? 0 : 1) - (b.section === "I" ? 0 : 1);
+    if (sec !== 0) return sec;
+    return idNumeric(a.id) - idNumeric(b.id);
+  });
 }
 
 function nextQuestionId(
@@ -53,10 +79,12 @@ export const useExamStore = create<ExamStore>()(
       config: JEE_MAIN_CONFIG,
       startedAt: null,
       submittedAt: null,
+      parseStatus: "idle",
 
       setQuestions: (qs) => {
+        const sorted = sortQuestions(qs);
         const answers: Record<string, AnswerState> = {};
-        qs.forEach((q) => {
+        sorted.forEach((q) => {
           answers[q.id] = {
             questionId: q.id,
             selected: null,
@@ -64,12 +92,43 @@ export const useExamStore = create<ExamStore>()(
           };
         });
         set({
-          questions: qs,
+          questions: sorted,
           answers,
-          currentQuestionId: qs[0]?.id ?? null,
-          currentSubject: qs[0]?.subject ?? "Mathematics",
+          currentQuestionId: sorted[0]?.id ?? null,
+          currentSubject: sorted[0]?.subject ?? "Mathematics",
         });
       },
+
+      addQuestions: (qs) => {
+        if (qs.length === 0) return;
+        set((state) => {
+          const byId = new Map<string, Question>();
+          for (const q of state.questions) byId.set(q.id, q);
+          for (const q of qs) byId.set(q.id, q);
+          const merged = sortQuestions(Array.from(byId.values()));
+          const answers = { ...state.answers };
+          for (const q of merged) {
+            if (!answers[q.id]) {
+              answers[q.id] = {
+                questionId: q.id,
+                selected: null,
+                status: "notVisited",
+              };
+            }
+          }
+          return {
+            questions: merged,
+            answers,
+            currentQuestionId: state.currentQuestionId ?? merged[0]?.id ?? null,
+            currentSubject:
+              state.questions.length === 0
+                ? merged[0]?.subject ?? "Mathematics"
+                : state.currentSubject,
+          };
+        });
+      },
+
+      setParseStatus: (s) => set({ parseStatus: s }),
 
       startExam: () => {
         const { questions } = get();
@@ -194,6 +253,7 @@ export const useExamStore = create<ExamStore>()(
           currentQuestionId: null,
           startedAt: null,
           submittedAt: null,
+          parseStatus: "idle",
         });
       },
     }),

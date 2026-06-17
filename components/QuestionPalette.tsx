@@ -11,7 +11,7 @@ interface PaletteProps {
 }
 
 const STATUS_CLASS: Record<AnswerState["status"], string> = {
-  notVisited: "bg-slate-200 text-slate-700 border-slate-300",
+  notVisited: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600",
   notAnswered: "bg-red-500 text-white border-red-500",
   answered: "bg-green-600 text-white border-green-600",
   markedReview: "bg-violet-600 text-white border-violet-600",
@@ -38,12 +38,12 @@ export default function QuestionPalette({
   );
 
   return (
-    <aside className="flex flex-col border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <aside className="flex flex-col border-l border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/70">
+        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           Question Palette
         </div>
-        <div className="mt-1 text-sm font-medium text-slate-800">
+        <div className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
           {currentSubject}
         </div>
       </div>
@@ -67,8 +67,8 @@ export default function QuestionPalette({
         })}
       </div>
 
-      <div className="mt-auto border-t border-slate-200 px-4 py-3">
-        <div className="space-y-1.5 text-xs text-slate-600">
+      <div className="mt-auto border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+        <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
           <LegendRow color="bg-green-600" label="Answered" count={counts.answered ?? 0} />
           <LegendRow color="bg-red-500" label="Not Answered" count={counts.notAnswered ?? 0} />
           <LegendRow color="bg-slate-300" label="Not Visited" count={counts.notVisited ?? 0} />

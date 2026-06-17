@@ -17,15 +17,15 @@ function SignInInner() {
   }, [status, callbackUrl, router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="text-xs font-medium uppercase tracking-wider text-brand-600">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="text-xs font-medium uppercase tracking-wider text-brand-600 dark:text-brand-500">
           Sign in
         </div>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">
+        <h1 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
           JEE Test Simulator
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           Sign in with Google to upload papers, configure your provider key, and
           take tests.
         </p>
@@ -40,7 +40,7 @@ function SignInInner() {
         >
           Continue with Google
         </button>
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
           Your API keys are encrypted with AES-256-GCM server-side and used only
           for your own requests.
         </p>

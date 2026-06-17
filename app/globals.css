@@ -3,8 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: #f8fafc;
   --foreground: #0f172a;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  color-scheme: dark;
 }
 
 html, body {
@@ -18,5 +24,4 @@ html, body {
   box-sizing: border-box;
 }
 
-/* Disable iOS tap highlight */
 button { -webkit-tap-highlight-color: transparent; }
