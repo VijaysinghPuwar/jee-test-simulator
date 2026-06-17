@@ -1,4 +1,5 @@
 import type { Provider } from "@/lib/key-store";
+import type { Subject } from "@/lib/types";
 import { parseWithAnthropic } from "./anthropic";
 import { parseWithOpenAI } from "./openai";
 import { parseWithGemini } from "./gemini";
@@ -6,6 +7,8 @@ import { parseWithGemini } from "./gemini";
 export interface ParseInput {
   questionPaperText: string;
   answerKeyText: string;
+  subject?: Subject;
+  signal?: AbortSignal;
 }
 
 export type ParseFn = (input: ParseInput, apiKey: string) => Promise<string>;

@@ -1,14 +1,16 @@
-export const SYSTEM_PROMPT = `You convert JEE Main exam paper text into structured JSON.
+import type { Subject } from "@/lib/types";
+
+export const SYSTEM_PROMPT_BASE = `You convert JEE Main exam paper text into structured JSON.
 
 You will receive two blocks of plain text extracted from PDFs:
-1. QUESTION_PAPER_TEXT — typically 75 questions (25 Mathematics, 25 Physics, 25 Chemistry), each with Section I (single-correct MCQ) or Section II (numerical/integer).
+1. QUESTION_PAPER_TEXT — the full paper (typically 75 questions: 25 Mathematics, 25 Physics, 25 Chemistry; Section I = single-correct MCQ, Section II = numerical).
 2. ANSWER_KEY_TEXT — the official answer key / solutions, listing the correct answer per question.
 
 Return ONLY a strict JSON array (no markdown, no code fences, no commentary). Begin with [ and end with ].
 
 Each item must be:
 {
-  "id": "<S><N>",                   // S = M|P|C, N = 1..25, e.g. "M1","P12","C25"
+  "id": "<S><N>",                  // S = M|P|C, N = 1..25, e.g. "M1","P12","C25"
   "subject": "Mathematics" | "Physics" | "Chemistry",
   "section": "I" | "II",
   "type": "mcq" | "numerical",
@@ -23,6 +25,25 @@ Rules:
 - For numerical, omit the "options" field.
 - Output ONLY the JSON array.`;
 
-export function buildUserPrompt(qp: string, ak: string): string {
-  return `QUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
+export const SUBJECT_LETTER: Record<Subject, "M" | "P" | "C"> = {
+  Mathematics: "M",
+  Physics: "P",
+  Chemistry: "C",
+};
+
+export function subjectSystemPrompt(subject: Subject): string {
+  const letter = SUBJECT_LETTER[subject];
+  return `${SYSTEM_PROMPT_BASE}
+
+THIS REQUEST: Extract ONLY the ${subject} questions. Skip every question for other subjects.
+- All ids must start with "${letter}" (e.g. "${letter}1" .. "${letter}25").
+- All items must have "subject": "${subject}".
+- Return at most 25 items.`;
+}
+
+export function buildUserPrompt(qp: string, ak: string, subject?: Subject): string {
+  const header = subject
+    ? `Extract only ${subject} questions and match each against the answer key.`
+    : "Extract all questions and match each against the answer key.";
+  return `${header}\n\nQUESTION_PAPER_TEXT:\n\n${qp}\n\n---\n\nANSWER_KEY_TEXT:\n\n${ak}\n\n---\n\nReturn ONLY the JSON array.`;
 }

@@ -15,7 +15,7 @@ function ensureWorker() {
 }
 
 export const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
-export const MAX_EXTRACT_LENGTH = 180_000;
+export const MAX_EXTRACT_LENGTH = 100_000;
 
 const PDF_MAGIC = "%PDF-";
 

@@ -1,25 +1,39 @@
 import OpenAI from "openai";
-import { buildUserPrompt, SYSTEM_PROMPT } from "./prompt";
+import {
+  buildUserPrompt,
+  SYSTEM_PROMPT_BASE,
+  subjectSystemPrompt,
+} from "./prompt";
 import type { ParseFn } from "./index";
 
 const MODEL = "gpt-4.1-mini";
 
 export const parseWithOpenAI: ParseFn = async (input, apiKey) => {
   const client = new OpenAI({ apiKey });
-  const res = await client.chat.completions.create({
-    model: MODEL,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `${SYSTEM_PROMPT}\n\nIMPORTANT: Wrap the JSON array inside an object as {"questions": [...]} since this endpoint requires a JSON object.`,
-      },
-      {
-        role: "user",
-        content: buildUserPrompt(input.questionPaperText, input.answerKeyText),
-      },
-    ],
-  });
+  const system = input.subject
+    ? subjectSystemPrompt(input.subject)
+    : SYSTEM_PROMPT_BASE;
+  const res = await client.chat.completions.create(
+    {
+      model: MODEL,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${system}\n\nIMPORTANT: This endpoint requires a JSON object. Wrap your JSON array inside an object as {"questions": [...]}.`,
+        },
+        {
+          role: "user",
+          content: buildUserPrompt(
+            input.questionPaperText,
+            input.answerKeyText,
+            input.subject
+          ),
+        },
+      ],
+    },
+    input.signal ? { signal: input.signal } : undefined
+  );
   const content = res.choices[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned no content");
   return content;

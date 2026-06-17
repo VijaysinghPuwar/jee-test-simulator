@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -57,16 +59,26 @@ export default function UploadPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Parse failed: ${res.status}`);
+        const msg =
+          res.status === 504
+            ? "Provider took too long to respond (timeout). Try a faster model (e.g. Gemini 2.0 Flash) or smaller PDFs."
+            : body.error || `Parse failed: ${res.status}`;
+        throw new Error(msg);
       }
-      const data = (await res.json()) as { questions: unknown[] };
+      const data = (await res.json()) as {
+        questions: unknown[];
+        partial?: { subject: string; error: string }[];
+      };
       const questions = data.questions as Parameters<typeof setQuestions>[0];
       if (!questions || questions.length === 0) {
         throw new Error("No questions extracted from the PDFs.");
       }
       setQuestions(questions);
       setStage("ready");
-      setProgress(`Extracted ${questions.length} questions`);
+      const partial = data.partial?.length
+        ? ` (${data.partial.map((p) => p.subject).join(", ")} failed — partial result)`
+        : "";
+      setProgress(`Extracted ${questions.length} questions${partial}`);
     } catch (e) {
       setStage("error");
       setError(e instanceof Error ? e.message : String(e));

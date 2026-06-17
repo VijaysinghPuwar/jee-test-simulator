@@ -14,8 +14,8 @@ export const TestTypeSchema = z.enum(["JEE_MAIN"]);
 
 export const ParseRequestSchema = z.object({
   testType: TestTypeSchema.default("JEE_MAIN"),
-  questionPaperText: z.string().min(50).max(200_000),
-  answerKeyText: z.string().min(10).max(200_000),
+  questionPaperText: z.string().min(50).max(120_000),
+  answerKeyText: z.string().min(10).max(120_000),
 });
 
 export const QuestionSchema = z.object({

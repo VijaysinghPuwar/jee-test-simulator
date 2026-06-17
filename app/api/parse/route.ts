@@ -9,12 +9,17 @@ import {
   QuestionsArraySchema,
   type ValidatedQuestion,
 } from "@/lib/validation";
+import type { Provider } from "@/lib/key-store";
+import type { Subject } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 const RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
+const PER_SUBJECT_TIMEOUT_MS = 50_000;
+const SUBJECTS: Subject[] = ["Mathematics", "Physics", "Chemistry"];
 
 function extractJsonArray(raw: string): unknown {
   let text = raw.trim();
@@ -39,6 +44,38 @@ function extractJsonArray(raw: string): unknown {
   throw new Error("Model output did not contain a JSON array");
 }
 
+async function parseSubject(
+  provider: Provider,
+  apiKey: string,
+  qp: string,
+  ak: string,
+  subject: Subject
+): Promise<ValidatedQuestion[]> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), PER_SUBJECT_TIMEOUT_MS);
+  let raw: string;
+  try {
+    raw = await parseWithProvider(provider, apiKey, {
+      questionPaperText: qp,
+      answerKeyText: ak,
+      subject,
+      signal: ac.signal,
+    });
+  } finally {
+    clearTimeout(t);
+  }
+  const parsed = extractJsonArray(raw);
+  const validated = QuestionsArraySchema.safeParse(parsed);
+  if (!validated.success) {
+    throw new Error(
+      `Schema validation failed for ${subject}: ${
+        validated.error.issues[0]?.message ?? "unknown"
+      }`
+    );
+  }
+  return validated.data.filter((q) => q.subject === subject);
+}
+
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as { id?: string } | undefined)?.id;
@@ -52,9 +89,7 @@ export async function POST(req: Request) {
       { error: "Rate limit exceeded. Try again shortly." },
       {
         status: 429,
-        headers: {
-          "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)),
-        },
+        headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) },
       }
     );
   }
@@ -81,36 +116,42 @@ export async function POST(req: Request) {
     );
   }
 
-  let rawText: string;
-  try {
-    rawText = await parseWithProvider(stored.provider, stored.apiKey, {
-      questionPaperText: parsed.data.questionPaperText,
-      answerKeyText: parsed.data.answerKeyText,
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+  const qp = parsed.data.questionPaperText;
+  const ak = parsed.data.answerKeyText;
+
+  const settled = await Promise.allSettled(
+    SUBJECTS.map((s) => parseSubject(stored.provider, stored.apiKey, qp, ak, s))
+  );
+
+  const all: ValidatedQuestion[] = [];
+  const errors: { subject: Subject; error: string }[] = [];
+  settled.forEach((r, i) => {
+    const subject = SUBJECTS[i];
+    if (r.status === "fulfilled") {
+      all.push(...r.value);
+    } else {
+      const message =
+        r.reason instanceof Error ? r.reason.message : String(r.reason);
+      errors.push({ subject, error: message });
+    }
+  });
+
+  if (all.length === 0) {
     return NextResponse.json(
-      { error: `Provider error: ${message}` },
+      {
+        error:
+          "All subjects failed to parse. " +
+          errors.map((e) => `${e.subject}: ${e.error}`).join(" | "),
+      },
       { status: 502 }
     );
   }
 
-  let parsedArr: unknown;
-  try {
-    parsedArr = extractJsonArray(rawText);
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json(
-      { error: `Could not parse model output: ${message}` },
-      { status: 502 }
-    );
-  }
-
-  const validated = QuestionsArraySchema.safeParse(parsedArr);
+  const validated = QuestionsArraySchema.safeParse(all);
   if (!validated.success) {
     return NextResponse.json(
       {
-        error: `Model output failed schema validation: ${
+        error: `Combined output failed schema validation: ${
           validated.error.issues[0]?.message ?? "unknown"
         }`,
       },
@@ -118,6 +159,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions: ValidatedQuestion[] = validated.data;
-  return NextResponse.json({ questions });
+  return NextResponse.json({
+    questions: validated.data,
+    partial: errors.length > 0 ? errors : undefined,
+  });
 }
