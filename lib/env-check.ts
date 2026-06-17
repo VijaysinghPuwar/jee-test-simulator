@@ -5,7 +5,6 @@ export interface EnvStatus {
 }
 
 const REQUIRED = [
-  "NEXTAUTH_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
   "ENCRYPTION_KEY",
@@ -21,6 +20,13 @@ export function checkServerEnv(): EnvStatus {
   const encKey = process.env.ENCRYPTION_KEY;
   if (encKey && encKey.length !== 64) {
     warnings.push("ENCRYPTION_KEY must be 64 hex characters (32 bytes).");
+  }
+  if (!process.env.NEXTAUTH_SECRET && !encKey) {
+    missing.push("NEXTAUTH_SECRET");
+  } else if (!process.env.NEXTAUTH_SECRET && encKey) {
+    warnings.push(
+      "NEXTAUTH_SECRET is not set; using ENCRYPTION_KEY as the NextAuth secret. Set a separate NEXTAUTH_SECRET in production."
+    );
   }
   if (
     !process.env.NEXTAUTH_URL &&

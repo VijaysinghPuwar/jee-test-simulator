@@ -6,10 +6,17 @@ import { useSession } from "next-auth/react";
 import Dropzone from "@/components/Dropzone";
 import NavBar from "@/components/NavBar";
 import { extractPdfText } from "@/lib/pdf-extract";
+import {
+  deleteSavedPaper,
+  readSavedPapers,
+  saveSavedPaper,
+  type SavedPaper,
+} from "@/lib/saved-papers";
 import { useExamStore } from "@/lib/store";
-import { JEE_MAIN_CONFIG, type Subject } from "@/lib/types";
+import { JEE_MAIN_CONFIG, type Question, type Subject } from "@/lib/types";
 
 type Stage = "idle" | "extracting" | "parsing" | "ready" | "error";
+type UploadMode = "separate" | "combined";
 
 interface ChunkProgress {
   subject: Subject;
@@ -24,21 +31,46 @@ const INIT_PROGRESS: ChunkProgress[] = [
   { subject: "Chemistry", status: "pending" },
 ];
 
+const COMBINED_ANSWER_KEY_NOTE =
+  "The answer key and solutions are included in the same uploaded PDF text. Use the answer key, solution explanations, or final-answer sections inside QUESTION_PAPER_TEXT to determine correctAnswer for each question.";
+
+function initialProgress(): ChunkProgress[] {
+  return INIT_PROGRESS.map((c) => ({ ...c }));
+}
+
+function fileBaseName(name: string): string {
+  return name.replace(/\.pdf$/i, "").trim() || name;
+}
+
+function formatSavedDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 export default function UploadPage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const setQuestions = useExamStore((s) => s.setQuestions);
   const addQuestions = useExamStore((s) => s.addQuestions);
   const setParseStatus = useExamStore((s) => s.setParseStatus);
   const startExam = useExamStore((s) => s.startExam);
   const reset = useExamStore((s) => s.reset);
+  const userScope = (session?.user?.email ?? "default").toLowerCase();
 
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [savedPapers, setSavedPapers] = useState<SavedPaper[]>([]);
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [uploadMode, setUploadMode] = useState<UploadMode>("separate");
+  const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [qpFile, setQpFile] = useState<File | null>(null);
   const [akFile, setAkFile] = useState<File | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
   const [progress, setProgress] = useState<string>("");
-  const [chunks, setChunks] = useState<ChunkProgress[]>(INIT_PROGRESS);
+  const [chunks, setChunks] = useState<ChunkProgress[]>(() => initialProgress());
   const [totalLoaded, setTotalLoaded] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -51,20 +83,63 @@ export default function UploadPage() {
       .catch(() => setHasKey(false));
   }, [status]);
 
-  const canStart = qpFile && akFile && stage === "idle" && hasKey;
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setSavedPapers([]);
+      return;
+    }
+    setSavedPapers(readSavedPapers(userScope));
+  }, [status, userScope]);
+
+  const canStart =
+    hasKey === true &&
+    stage === "idle" &&
+    (uploadMode === "combined" ? Boolean(combinedFile) : Boolean(qpFile && akFile));
+
+  function resetParseUi() {
+    setStage("idle");
+    setProgress("");
+    setChunks(initialProgress());
+    setTotalLoaded(0);
+    setError(null);
+    setSavedNotice(null);
+    setConfirming(false);
+    setParseStatus("idle");
+  }
 
   async function handleStart() {
-    if (!qpFile || !akFile) return;
+    if (uploadMode === "combined" && !combinedFile) return;
+    if (uploadMode === "separate" && (!qpFile || !akFile)) return;
     reset();
     setError(null);
-    setChunks(INIT_PROGRESS);
+    setSavedNotice(null);
+    setChunks(initialProgress());
     setTotalLoaded(0);
     try {
       setStage("extracting");
-      setProgress("Extracting Question Paper text…");
-      const questionPaperText = await extractPdfText(qpFile);
-      setProgress("Extracting Answer Key text…");
-      const answerKeyText = await extractPdfText(akFile);
+      let questionPaperText: string;
+      let answerKeyText: string;
+      let paperTitle: string;
+      let sourceFiles: string[];
+
+      if (uploadMode === "combined") {
+        const file = combinedFile as File;
+        paperTitle = fileBaseName(file.name);
+        sourceFiles = [file.name];
+        setProgress("Extracting combined question and answer PDF text…");
+        questionPaperText = await extractPdfText(file);
+        answerKeyText = COMBINED_ANSWER_KEY_NOTE;
+      } else {
+        const questionFile = qpFile as File;
+        const keyFile = akFile as File;
+        paperTitle = fileBaseName(questionFile.name);
+        sourceFiles = [questionFile.name, keyFile.name];
+        setProgress("Extracting Question Paper text…");
+        questionPaperText = await extractPdfText(questionFile);
+        setProgress("Extracting Answer Key text…");
+        answerKeyText = await extractPdfText(keyFile);
+      }
+
       setStage("parsing");
       setParseStatus("streaming");
       setProgress("Calling your provider — questions will appear as each subject completes…");
@@ -92,6 +167,7 @@ export default function UploadPage() {
       let total = 0;
       let errorCount = 0;
       let lastErr: string | null = null;
+      const parsedQuestions: Question[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -114,8 +190,10 @@ export default function UploadPage() {
             continue;
           }
           if (msg.type === "chunk" && msg.questions && msg.subject) {
-            addQuestions(msg.questions);
-            total += msg.questions.length;
+            const questions = msg.questions;
+            addQuestions(questions);
+            parsedQuestions.push(...questions);
+            total += questions.length;
             okCount += 1;
             setTotalLoaded(total);
             setChunks((prev) =>
@@ -151,6 +229,22 @@ export default function UploadPage() {
       setProgress(
         `Loaded ${total} questions${errorCount > 0 ? ` (${errorCount} subject${errorCount > 1 ? "s" : ""} failed)` : ""}`
       );
+      try {
+        const saved = saveSavedPaper(userScope, {
+          title: paperTitle,
+          sourceMode: uploadMode,
+          sourceFiles,
+          questions: parsedQuestions,
+        });
+        setSavedPapers(readSavedPapers(userScope));
+        setSavedNotice(`Saved "${saved.title}" for later.`);
+      } catch (saveError) {
+        setSavedNotice(
+          `Loaded questions, but could not save locally: ${
+            saveError instanceof Error ? saveError.message : String(saveError)
+          }`
+        );
+      }
     } catch (e) {
       setStage("error");
       setParseStatus("error");
@@ -158,14 +252,22 @@ export default function UploadPage() {
     }
   }
 
-  function handleConfirm() {
+  function startSavedPaper(paper: SavedPaper) {
+    reset();
+    setQuestions(paper.questions);
+    setParseStatus("complete");
     startExam();
     router.push("/exam");
   }
 
-  // Reuse setQuestions for the (unlikely) full-replace path below — keep the
-  // import alive without an unused-variable warning.
-  void setQuestions;
+  function removeSavedPaper(id: string) {
+    setSavedPapers(deleteSavedPaper(userScope, id));
+  }
+
+  function handleConfirm() {
+    startExam();
+    router.push("/exam");
+  }
 
   if (status === "loading") {
     return (
@@ -187,7 +289,8 @@ export default function UploadPage() {
           </h1>
           <p className="mt-3 text-sm text-slate-600">
             Sign in with Google, add your own API key (Anthropic / OpenAI /
-            Gemini), and upload your question paper + answer key PDFs.
+            Gemini), and upload either separate question/key PDFs or one
+            combined PDF.
           </p>
           <button
             onClick={() => router.push("/signin")}
@@ -213,8 +316,8 @@ export default function UploadPage() {
               Upload Papers
             </h1>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Upload your Question Paper and Answer Key PDFs to begin an
-              NTA-style JEE Main test.
+              Upload one combined question-and-answer PDF, or separate Question
+              Paper and Answer Key PDFs, to begin an NTA-style JEE Main test.
             </p>
           </header>
 
@@ -237,27 +340,124 @@ export default function UploadPage() {
             </div>
           )}
 
+          {savedPapers.length > 0 && (
+            <section className="mb-8">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Saved Question Papers
+                </h2>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {savedPapers.length} saved
+                </span>
+              </div>
+              <div className="grid gap-3">
+                {savedPapers.map((paper) => (
+                  <article
+                    key={paper.id}
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {paper.title}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                          <span>{paper.questionCount} questions</span>
+                          <span>
+                            {paper.sourceMode === "combined"
+                              ? "Combined PDF"
+                              : "Separate PDFs"}
+                          </span>
+                          <span>Saved {formatSavedDate(paper.updatedAt)}</span>
+                        </div>
+                        <div className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
+                          {paper.sourceFiles.join(" + ")}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startSavedPaper(paper)}
+                          className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+                        >
+                          Start
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSavedPaper(paper.id)}
+                          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Dropzone
-                label="Question Paper PDF"
-                file={qpFile}
-                onFile={(f) => {
-                  setQpFile(f);
-                  setStage("idle");
-                  setError(null);
-                }}
-              />
-              <Dropzone
-                label="Answer Key / Solutions PDF"
-                file={akFile}
-                onFile={(f) => {
-                  setAkFile(f);
-                  setStage("idle");
-                  setError(null);
-                }}
-              />
+            <div className="mb-5 inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1 text-sm dark:border-slate-800 dark:bg-slate-950">
+              {(
+                [
+                  ["separate", "Separate PDFs"],
+                  ["combined", "One combined PDF"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    setUploadMode(mode);
+                    resetParseUi();
+                  }}
+                  className={`rounded-md px-3 py-1.5 font-medium transition ${
+                    uploadMode === mode
+                      ? "bg-white text-brand-700 shadow-sm dark:bg-slate-800 dark:text-brand-300"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+
+            {uploadMode === "combined" ? (
+              <div className="space-y-3">
+                <Dropzone
+                  label="Combined Question + Answer PDF"
+                  file={combinedFile}
+                  onFile={(f) => {
+                    setCombinedFile(f);
+                    resetParseUi();
+                  }}
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Use this when the same PDF contains the question paper and the
+                  official answer key or solutions.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Dropzone
+                  label="Question Paper PDF"
+                  file={qpFile}
+                  onFile={(f) => {
+                    setQpFile(f);
+                    resetParseUi();
+                  }}
+                />
+                <Dropzone
+                  label="Answer Key / Solutions PDF"
+                  file={akFile}
+                  onFile={(f) => {
+                    setAkFile(f);
+                    resetParseUi();
+                  }}
+                />
+              </div>
+            )}
 
             {stage !== "idle" && (
               <div className="mt-6 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
@@ -302,12 +502,20 @@ export default function UploadPage() {
                 {error && (
                   <div className="mt-2 text-xs text-red-600">{error}</div>
                 )}
+                {savedNotice && (
+                  <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">
+                    {savedNotice}
+                  </div>
+                )}
               </div>
             )}
 
             <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-800">
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                <span className="font-medium text-slate-700 dark:text-slate-200">JEE Main</span> ·{" "}
+                <span className="font-medium text-slate-700 dark:text-slate-200">
+                  JEE Main
+                </span>{" "}
+                · {uploadMode === "combined" ? "Combined PDF" : "Separate PDFs"} ·{" "}
                 {JEE_MAIN_CONFIG.totalQuestions} questions ·{" "}
                 {JEE_MAIN_CONFIG.durationSeconds / 3600} hrs · +
                 {JEE_MAIN_CONFIG.positiveMark} / −{JEE_MAIN_CONFIG.negativeMark}

@@ -66,9 +66,9 @@ export default function SetupRequired({ status }: { status: EnvStatus }) {
           <ol className="mt-2 list-decimal space-y-1 pl-5">
             <li>Vercel → Project → Settings → Environment Variables.</li>
             <li>
-              Add all of: <code>NEXTAUTH_SECRET</code>,{" "}
-              <code>NEXTAUTH_URL</code>, <code>GOOGLE_CLIENT_ID</code>,{" "}
-              <code>GOOGLE_CLIENT_SECRET</code>, <code>ENCRYPTION_KEY</code>.
+              Add: <code>NEXTAUTH_URL</code>, <code>GOOGLE_CLIENT_ID</code>,{" "}
+              <code>GOOGLE_CLIENT_SECRET</code>, <code>ENCRYPTION_KEY</code>,
+              and preferably a separate <code>NEXTAUTH_SECRET</code>.
             </li>
             <li>Apply to Production (and Preview if needed) and redeploy.</li>
             <li>

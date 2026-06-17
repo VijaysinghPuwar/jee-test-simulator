@@ -2,7 +2,7 @@
 
 A secure, BYOK (Bring-Your-Own-Key) NTA-style JEE Main computer-based test simulator.
 
-Upload a question paper PDF + answer key PDF, parse them with the LLM provider of your choice (Anthropic Claude, OpenAI, or Google Gemini), and take a full timed test with a real exam interface.
+Upload either one combined question-and-answer PDF or separate question paper + answer key PDFs, parse them with the LLM provider of your choice (Anthropic Claude, OpenAI, or Google Gemini), and take a full timed test with a real exam interface.
 
 ## Stack
 
@@ -24,6 +24,7 @@ Upload a question paper PDF + answer key PDF, parse them with the LLM provider o
 - **Output validation.** Model output is `JSON.parse`d inside try/catch and validated against a Zod schema before use — never `eval`. Bad output returns `502`.
 - **Security headers.** CSP, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, and HSTS, set in `next.config.ts`.
 - **CSRF.** NextAuth's built-in CSRF + sameSite=strict cookies; mutating routes are session-checked.
+- **Saved papers.** Parsed question papers are saved in browser `localStorage` per signed-in email so you can start them later without uploading PDFs again. They stay on that browser/device unless removed.
 
 ## Local setup
 
@@ -41,7 +42,7 @@ App runs at `http://localhost:3000`.
 | Var | Notes |
 |---|---|
 | `NEXTAUTH_URL` | `http://localhost:3000` in dev; your full URL in prod. |
-| `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
+| `NEXTAUTH_SECRET` | Recommended: `openssl rand -base64 32`. If omitted, the app falls back to `ENCRYPTION_KEY` for NextAuth. |
 | `GOOGLE_CLIENT_ID` | From Google Cloud → APIs & Services → Credentials. |
 | `GOOGLE_CLIENT_SECRET` | Same screen. |
 | `ENCRYPTION_KEY` | 32-byte hex (64 chars). Generate with `openssl rand -hex 32`. |
@@ -57,12 +58,12 @@ App runs at `http://localhost:3000`.
 
 ## Deploy to Vercel
 
-> **You MUST set all five env vars in Vercel before the app will work.** If any are missing the home page will show a "Setup required" screen and `/api/auth/*` will return `500` with `[next-auth][error][NO_SECRET]`.
+> **You MUST set Google OAuth vars and `ENCRYPTION_KEY` in Vercel before the app will work.** `NEXTAUTH_SECRET` is strongly recommended, but the app can fall back to `ENCRYPTION_KEY` if it is missing.
 
 1. Push this repo to GitHub.
 2. https://vercel.com/new → import the repo.
-3. In **Vercel → Project → Settings → Environment Variables**, add all five vars:
-   - `NEXTAUTH_SECRET` — `openssl rand -base64 32`
+3. In **Vercel → Project → Settings → Environment Variables**, add these vars:
+   - `NEXTAUTH_SECRET` — `openssl rand -base64 32` (recommended)
    - `NEXTAUTH_URL` — your full deployed URL, e.g. `https://jee-test-simulator.vercel.app`
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
@@ -75,7 +76,7 @@ App runs at `http://localhost:3000`.
 
 ### Troubleshooting
 
-- `[next-auth][error][NO_SECRET]` in Vercel logs → `NEXTAUTH_SECRET` is missing. Set it and redeploy.
+- `[next-auth][error][NO_SECRET]` in Vercel logs → both `NEXTAUTH_SECRET` and `ENCRYPTION_KEY` are missing. Set at least `ENCRYPTION_KEY`, preferably both, and redeploy.
 - `/api/health` returns 503 with a `missing` array → those env vars are unset.
 - Sign-in redirects back to `/signin?error=Configuration` → either `NEXTAUTH_URL` is wrong or the Google redirect URI doesn't match exactly.
 
@@ -91,10 +92,11 @@ Notes for Vercel:
    - Anthropic: `console.anthropic.com` (model: `claude-sonnet-4-6`)
    - OpenAI: `platform.openai.com` (model: `gpt-4.1-mini`)
    - Gemini: `aistudio.google.com` (model: `gemini-2.0-flash`)
-3. From the home page, upload **Question Paper PDF** + **Answer Key / Solutions PDF**.
-4. Click **Parse PDFs** → **Start Test**.
-5. Take the test (3 hr · 75 Q · Maths / Physics / Chemistry · +4 / −1).
-6. Submit to see your subject-wise score, charts, and per-question review.
+3. From the home page, choose **Separate PDFs** or **One combined PDF**.
+4. Upload the PDF source and click **Parse PDFs**. A successful parse is saved automatically.
+5. Click **Start Test**, or later use **Saved Question Papers** → **Start** without uploading again.
+6. Take the test (3 hr · 75 Q · Maths / Physics / Chemistry · +4 / −1).
+7. Submit to see your subject-wise score, charts, and per-question review.
 
 ## File layout
 
