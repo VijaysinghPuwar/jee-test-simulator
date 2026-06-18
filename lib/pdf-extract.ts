@@ -34,7 +34,7 @@ export interface ExtractedPdfContent {
 }
 
 interface ExtractPdfContentOptions {
-  includePageImages?: boolean;
+  includePageImages?: boolean | "auto";
 }
 
 const PDF_MAGIC = "%PDF-";
@@ -62,6 +62,31 @@ function cleanLines(lines: string[]): string {
     .filter((l) => l.length > 0)
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
+}
+
+function pageNeedsVisionFallback(text: string): boolean {
+  const cleaned = text
+    .replace(/Question Paper/gi, "")
+    .replace(
+      /(?:Physics|Chemistry|Mathematics)\s+(?:Si\s*ngle|Single)\s+Correct/gi,
+      ""
+    )
+    .replace(/(?:Physics|Chemistry|Mathematics)\s+Numerical/gi, "")
+    .replace(/Maximum Marks:\s*\d+/gi, "")
+    .replace(/Question No\.?\s*\d+/gi, "")
+    .replace(/Only One Option Correct Type/gi, "")
+    .replace(/Each question has multiple options out of which ONLY ONE is correct\.?/gi, "")
+    .replace(/Numerical Type/gi, "")
+    .replace(/C\s*I\s*P\s*H\s*Ξ\s*R/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const hasQuestionSignal =
+    /Question No\.?\s*\d+|Only One Option Correct Type|Numerical Type/i.test(
+      text
+    );
+  const alphaNumericCount = cleaned.replace(/[^A-Za-z0-9]/g, "").length;
+  return hasQuestionSignal && alphaNumericCount < 180;
 }
 
 async function extractPageText(page: PDFPageProxy): Promise<string> {
@@ -130,7 +155,11 @@ export async function extractPdfContent(
     const cleaned = await extractPageText(page);
     const pageInfo: ExtractedPdfPage = { pageNumber: i, text: cleaned };
     pageTexts.push(`--- Page ${i} ---\n${cleaned}`);
-    if (options.includePageImages && pages.length < MAX_PAGE_IMAGE_COUNT) {
+    const shouldRenderImage =
+      options.includePageImages === true ||
+      (options.includePageImages === "auto" &&
+        pageNeedsVisionFallback(cleaned));
+    if (shouldRenderImage && pages.length < MAX_PAGE_IMAGE_COUNT) {
       pageInfo.imageDataUrl = await renderPageImage(page);
     }
     pages.push(pageInfo);

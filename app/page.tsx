@@ -33,6 +33,7 @@ const INIT_PROGRESS: ChunkProgress[] = [
   { subject: "Physics", status: "pending" },
   { subject: "Chemistry", status: "pending" },
 ];
+const SUBJECTS = INIT_PROGRESS.map((c) => c.subject);
 
 const COMBINED_ANSWER_KEY_NOTE =
   "The answer key and solutions are included in the same uploaded PDF text. Use the answer key, solution explanations, or final-answer sections inside QUESTION_PAPER_TEXT to determine correctAnswer for each question.";
@@ -143,9 +144,11 @@ export default function UploadPage() {
         const file = combinedFile as File;
         paperTitle = fileBaseName(file.name);
         sourceFiles = [file.name];
-        setProgress("Extracting combined PDF text and page images…");
+        setProgress(
+          "Extracting combined PDF text with selective page image fallback…"
+        );
         const questionPaper = await extractPdfContent(file, {
-          includePageImages: true,
+          includePageImages: "auto",
         });
         questionPaperText = questionPaper.text;
         questionPaperPageImages = pageImagePayload(questionPaper.pages);
@@ -155,101 +158,124 @@ export default function UploadPage() {
         const keyFile = akFile as File;
         paperTitle = fileBaseName(questionFile.name);
         sourceFiles = [questionFile.name, keyFile.name];
-        setProgress("Extracting Question Paper text and page images…");
+        setProgress(
+          "Extracting Question Paper text with selective page image fallback…"
+        );
         const questionPaper = await extractPdfContent(questionFile, {
-          includePageImages: true,
+          includePageImages: "auto",
         });
         questionPaperText = questionPaper.text;
         questionPaperPageImages = pageImagePayload(questionPaper.pages);
-        setProgress("Extracting Answer Key text…");
-        const answerKey = await extractPdfContent(keyFile);
+        setProgress("Extracting Answer Key text with selective page image fallback…");
+        const answerKey = await extractPdfContent(keyFile, {
+          includePageImages: "auto",
+        });
         answerKeyText = answerKey.text;
+        answerKeyPageImages = pageImagePayload(answerKey.pages);
       }
 
       setStage("parsing");
       setParseStatus("streaming");
-      setProgress("Calling your provider — questions will appear as each subject completes…");
-
-      const res = await fetch("/api/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          testType: "JEE_MAIN",
-          questionPaperText,
-          answerKeyText,
-          questionPaperPageImages,
-          answerKeyPageImages,
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Parse failed: ${res.status}`);
-      }
-      if (!res.body) throw new Error("No response body from server.");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
       let okCount = 0;
       let total = 0;
       let errorCount = 0;
       let lastErr: string | null = null;
       const parsedQuestions: Question[] = [];
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          let msg: {
-            type: string;
-            subject?: Subject;
-            questions?: Parameters<typeof addQuestions>[0];
-            count?: number;
-            error?: string;
-          };
-          try {
-            msg = JSON.parse(line);
-          } catch {
-            continue;
+      for (const subject of SUBJECTS) {
+        setProgress(
+          `Parsing ${subject} — questions will appear as each subject completes…`
+        );
+        try {
+          const res = await fetch("/api/parse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              testType: "JEE_MAIN",
+              subjects: [subject],
+              questionPaperText,
+              answerKeyText,
+              questionPaperPageImages,
+              answerKeyPageImages,
+            }),
+          });
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || `Parse failed: ${res.status}`);
           }
-          if (msg.type === "chunk" && msg.questions && msg.subject) {
-            const questions = msg.questions;
-            addQuestions(questions);
-            parsedQuestions.push(...questions);
-            total += questions.length;
-            okCount += 1;
-            setTotalLoaded(total);
-            setChunks((prev) =>
-              prev.map((c) =>
-                c.subject === msg.subject
-                  ? { ...c, status: "ok", count: msg.count }
-                  : c
-              )
-            );
-          } else if (msg.type === "error" && msg.subject) {
-            errorCount += 1;
-            lastErr = msg.error ?? "unknown";
-            setChunks((prev) =>
-              prev.map((c) =>
-                c.subject === msg.subject
-                  ? { ...c, status: "error", error: msg.error }
-                  : c
-              )
-            );
-          } else if (msg.type === "done") {
-            // stream ended
+          if (!res.body) throw new Error("No response body from server.");
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              let msg: {
+                type: string;
+                subject?: Subject;
+                questions?: Parameters<typeof addQuestions>[0];
+                count?: number;
+                error?: string;
+              };
+              try {
+                msg = JSON.parse(line);
+              } catch {
+                continue;
+              }
+              if (msg.type === "chunk" && msg.questions && msg.subject) {
+                const questions = msg.questions;
+                addQuestions(questions);
+                parsedQuestions.push(...questions);
+                total += questions.length;
+                okCount += 1;
+                setTotalLoaded(total);
+                setChunks((prev) =>
+                  prev.map((c) =>
+                    c.subject === msg.subject
+                      ? { ...c, status: "ok", count: msg.count }
+                      : c
+                  )
+                );
+              } else if (msg.type === "error" && msg.subject) {
+                errorCount += 1;
+                lastErr = msg.error ?? "unknown";
+                setChunks((prev) =>
+                  prev.map((c) =>
+                    c.subject === msg.subject
+                      ? { ...c, status: "error", error: msg.error }
+                      : c
+                  )
+                );
+              }
+            }
           }
+        } catch (subjectError) {
+          errorCount += 1;
+          lastErr =
+            subjectError instanceof Error
+              ? subjectError.message
+              : String(subjectError);
+          setChunks((prev) =>
+            prev.map((c) =>
+              c.subject === subject
+                ? { ...c, status: "error", error: lastErr ?? undefined }
+                : c
+            )
+          );
         }
       }
 
       if (okCount === 0) {
         throw new Error(
-          `All subjects failed${lastErr ? `: ${lastErr}` : ""}. Try OpenAI / ChatGPT API, Anthropic Claude, or Gemini in Settings with a valid provider key.`
+          `All subjects failed${lastErr ? `: ${lastErr}` : ""}. Try again with a text-readable PDF, or use OpenAI / ChatGPT API, Anthropic Claude, or Gemini in Settings with a valid provider key.`
         );
       }
       setStage("ready");

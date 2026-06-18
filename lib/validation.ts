@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const ProviderSchema = z.enum(["anthropic", "openai", "gemini"]);
+export const SubjectSchema = z.enum(["Mathematics", "Physics", "Chemistry"]);
 
 export const SaveKeySchema = z.object({
   provider: ProviderSchema,
@@ -23,6 +24,7 @@ export const PageImageSchema = z.object({
 
 export const ParseRequestSchema = z.object({
   testType: TestTypeSchema.default("JEE_MAIN"),
+  subjects: z.array(SubjectSchema).min(1).max(3).optional(),
   questionPaperText: z.string().min(50).max(120_000),
   answerKeyText: z.string().min(10).max(120_000),
   questionPaperPageImages: z.array(PageImageSchema).max(40).optional(),
@@ -31,7 +33,7 @@ export const ParseRequestSchema = z.object({
 
 export const QuestionSchema = z.object({
   id: z.string().min(1).max(16),
-  subject: z.enum(["Mathematics", "Physics", "Chemistry"]),
+  subject: SubjectSchema,
   section: z.enum(["I", "II"]),
   type: z.enum(["mcq", "numerical"]),
   questionText: z.string().min(1).max(4000),

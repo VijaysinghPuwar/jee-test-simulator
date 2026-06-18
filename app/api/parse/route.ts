@@ -76,6 +76,17 @@ function isWeakQuestion(q: ValidatedQuestion): boolean {
   return false;
 }
 
+function providerErrorMessage(e: unknown, subject: Subject): string {
+  const message = e instanceof Error ? e.message : String(e);
+  const name = e instanceof Error ? e.name : "";
+  if (/abort|aborted|timeout|timed out/i.test(`${name} ${message}`)) {
+    return `${subject} timed out after ${Math.round(
+      PER_CALL_TIMEOUT_MS / 1000
+    )}s. Try again, use a text-readable PDF, or switch provider/model in Settings.`;
+  }
+  return message;
+}
+
 async function parseSubject(
   provider: Provider,
   apiKey: string,
@@ -161,6 +172,7 @@ export async function POST(req: Request) {
   const ak = parsed.data.answerKeyText;
   const qpImages = parsed.data.questionPaperPageImages ?? [];
   const akImages = parsed.data.answerKeyPageImages ?? [];
+  const subjects = parsed.data.subjects ?? SUBJECTS;
   const provider = stored.provider;
   const apiKey = stored.apiKey;
 
@@ -171,9 +183,9 @@ export async function POST(req: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
       };
 
-      send({ type: "start", total: SUBJECTS.length, provider });
+      send({ type: "start", total: subjects.length, provider });
 
-      const tasks = SUBJECTS.map(async (subject) => {
+      const tasks = subjects.map(async (subject) => {
         try {
           const subjectQuestionImages = pickSubjectPageImages(qpImages, subject);
           const subjectAnswerImages = pickSubjectPageImages(akImages, subject);
@@ -193,8 +205,11 @@ export async function POST(req: Request) {
             questions,
           });
         } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
-          send({ type: "error", subject, error: message });
+          send({
+            type: "error",
+            subject,
+            error: providerErrorMessage(e, subject),
+          });
         }
       });
 
