@@ -53,7 +53,7 @@ export function pickSubjectPageImages(
       otherSubjects.some((other) => hasSubjectHeading(text, other)) &&
       !hasSubjectHeading(text, subject)
     ) {
-      end = i;
+      end = i - 1;
       break;
     }
   }

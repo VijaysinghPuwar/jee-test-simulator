@@ -38,6 +38,8 @@ interface ExtractPdfContentOptions {
 }
 
 const PDF_MAGIC = "%PDF-";
+const QUESTION_PAGE_PATTERN =
+  /(?:^|[\n ])\s*(?:0?[1-9]|[1-7]\d)\.\s|Question No\.?\s*\d+|SECTION\s*[-–]?\s*(?:I|II|1|2)|Only One Option Correct Type|Numerical Type/i;
 
 export async function validatePdfFile(file: File): Promise<void> {
   if (file.size > MAX_PDF_SIZE_BYTES) {
@@ -75,18 +77,25 @@ function pageNeedsVisionFallback(text: string): boolean {
     .replace(/Maximum Marks:\s*\d+/gi, "")
     .replace(/Question No\.?\s*\d+/gi, "")
     .replace(/Only One Option Correct Type/gi, "")
-    .replace(/Each question has multiple options out of which ONLY ONE is correct\.?/gi, "")
+    .replace(
+      /Each question has multiple options out of which ONLY ONE is correct\.?/gi,
+      ""
+    )
     .replace(/Numerical Type/gi, "")
     .replace(/C\s*I\s*P\s*H\s*Ξ\s*R/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 
-  const hasQuestionSignal =
-    /Question No\.?\s*\d+|Only One Option Correct Type|Numerical Type/i.test(
-      text
-    );
+  const hasQuestionSignal = QUESTION_PAGE_PATTERN.test(text);
   const alphaNumericCount = cleaned.replace(/[^A-Za-z0-9]/g, "").length;
-  return hasQuestionSignal && alphaNumericCount < 180;
+  const privateUseGlyphCount = (text.match(/[\uE000-\uF8FF]/g) ?? []).length;
+  const hasCorruptedFormulaGlyphs =
+    privateUseGlyphCount >= 20 ||
+    privateUseGlyphCount / Math.max(text.length, 1) > 0.004;
+  return (
+    hasQuestionSignal &&
+    (alphaNumericCount < 180 || hasCorruptedFormulaGlyphs)
+  );
 }
 
 async function extractPageText(page: PDFPageProxy): Promise<string> {

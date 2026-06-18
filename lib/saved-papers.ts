@@ -1,4 +1,4 @@
-import type { Question } from "@/lib/types";
+import { JEE_MAIN_CONFIG, type Question } from "@/lib/types";
 
 export type SavedPaperSourceMode = "separate" | "combined";
 
@@ -57,6 +57,7 @@ function isSavedPaper(value: unknown): value is SavedPaper {
     Array.isArray(paper.sourceFiles) &&
     paper.sourceFiles.every((name) => typeof name === "string") &&
     Array.isArray(paper.questions) &&
+    paper.questions.length === JEE_MAIN_CONFIG.totalQuestions &&
     paper.questions.every(isQuestion)
   );
 }
@@ -88,6 +89,12 @@ export function saveSavedPaper(
   scope: string,
   input: SavePaperInput
 ): SavedPaper {
+  if (input.questions.length !== JEE_MAIN_CONFIG.totalQuestions) {
+    throw new Error(
+      `Cannot save an incomplete paper (${input.questions.length}/${JEE_MAIN_CONFIG.totalQuestions} questions).`
+    );
+  }
+
   const now = new Date().toISOString();
   const papers = readSavedPapers(scope);
   const sourceKey = `${input.sourceMode}:${input.sourceFiles.join("|")}`;

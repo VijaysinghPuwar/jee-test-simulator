@@ -28,6 +28,7 @@ Rules:
 - For mcq, options are the 4 choices (1)(2)(3)(4) in order, without the leading numeral/parenthesis.
 - For numerical, omit the "options" field.
 - Preserve mathematical formulas using LaTeX delimiters, e.g. $x^2$, $\\frac{a}{b}$, $\\begin{cases}...\\end{cases}$.
+- For Mathematics, if the extracted text contains Symbol/private-use glyphs such as , , , , , , , , , ignore those corrupted glyphs and transcribe the formula from the page image into clean LaTeX.
 - Preserve chemical formulas with Unicode subscripts/superscripts when simple (H₂SO₄, Fe³⁺) or LaTeX when needed.
 - For diagrams or reaction schemes, describe the visible diagram/reaction in enough text that a student can answer the question. Do not leave only "(1)", "(2)", "(3)", "(4)" as options.
 - Never use generic instructions like "Only One Option Correct Type" or "Each question has multiple options..." as the questionText.
@@ -48,6 +49,7 @@ You MUST return EXACTLY 25 question objects for ${subject}:
   - 20 in Section I (single-correct MCQ, ids ${letter}1..${letter}20, each with 4 options)
   - 5 in Section II (numerical, ids ${letter}21..${letter}25, NO options field)
 - Every item must have "subject": "${subject}" and id starting with "${letter}".
+- For Mathematics, preserve each equation, matrix, summation, integral, limit, and case expression in clean LaTeX using $...$ delimiters.
 - If a question is unclear, transcribe the best visible details from the page image/text; do not emit a generic stub.
 - Do NOT skip questions. Do NOT stop early. Return all 25 items.`;
 }

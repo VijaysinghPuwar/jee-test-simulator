@@ -120,9 +120,9 @@ async function parseSubject(
   }
   const questions = validated.data.filter((q) => q.subject === subject);
   const weak = questions.filter(isWeakQuestion);
-  if (questions.length < 20 || weak.length > 2) {
+  if (questions.length !== 25 || weak.length > 2) {
     throw new Error(
-      `Parsed ${subject} questions are incomplete (${questions.length} total, ${weak.length} weak). Reparse with a vision-capable provider and page images enabled.`
+      `Parsed ${subject} questions are incomplete (${questions.length}/25 total, ${weak.length} weak). Reparse with a vision-capable provider and page images enabled.`
     );
   }
   return questions;

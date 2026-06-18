@@ -15,6 +15,7 @@ import {
   saveSavedPaper,
   type SavedPaper,
 } from "@/lib/saved-papers";
+import { pickSubjectPageImages } from "@/lib/providers/image-input";
 import { useExamStore } from "@/lib/store";
 import { JEE_MAIN_CONFIG, type Question, type Subject } from "@/lib/types";
 
@@ -107,9 +108,9 @@ export default function UploadPage() {
     setSavedPapers(readSavedPapers(userScope));
   }, [status, userScope]);
 
-  const canStart =
+  const canParse =
     hasKey === true &&
-    stage === "idle" &&
+    (stage === "idle" || stage === "error") &&
     (uploadMode === "combined" ? Boolean(combinedFile) : Boolean(qpFile && akFile));
 
   function resetParseUi() {
@@ -166,12 +167,9 @@ export default function UploadPage() {
         });
         questionPaperText = questionPaper.text;
         questionPaperPageImages = pageImagePayload(questionPaper.pages);
-        setProgress("Extracting Answer Key text with selective page image fallback…");
-        const answerKey = await extractPdfContent(keyFile, {
-          includePageImages: "auto",
-        });
+        setProgress("Extracting Answer Key text…");
+        const answerKey = await extractPdfContent(keyFile);
         answerKeyText = answerKey.text;
-        answerKeyPageImages = pageImagePayload(answerKey.pages);
       }
 
       setStage("parsing");
@@ -183,6 +181,14 @@ export default function UploadPage() {
       const parsedQuestions: Question[] = [];
 
       for (const subject of SUBJECTS) {
+        const subjectQuestionPaperPageImages = pickSubjectPageImages(
+          questionPaperPageImages,
+          subject
+        );
+        const subjectAnswerKeyPageImages = pickSubjectPageImages(
+          answerKeyPageImages,
+          subject
+        );
         setProgress(
           `Parsing ${subject} — questions will appear as each subject completes…`
         );
@@ -195,8 +201,8 @@ export default function UploadPage() {
               subjects: [subject],
               questionPaperText,
               answerKeyText,
-              questionPaperPageImages,
-              answerKeyPageImages,
+              questionPaperPageImages: subjectQuestionPaperPageImages,
+              answerKeyPageImages: subjectAnswerKeyPageImages,
             }),
           });
 
@@ -278,6 +284,13 @@ export default function UploadPage() {
           `All subjects failed${lastErr ? `: ${lastErr}` : ""}. Try again with a text-readable PDF, or use OpenAI / ChatGPT API, Anthropic Claude, or Gemini in Settings with a valid provider key.`
         );
       }
+      if (okCount !== SUBJECTS.length || total !== JEE_MAIN_CONFIG.totalQuestions) {
+        throw new Error(
+          `Loaded ${total}/${JEE_MAIN_CONFIG.totalQuestions} questions. ${
+            lastErr ? `Last error: ${lastErr}` : "At least one subject failed."
+          } Reparse before starting or saving this paper.`
+        );
+      }
       setStage("ready");
       setParseStatus("complete");
       setProgress(
@@ -300,6 +313,7 @@ export default function UploadPage() {
         );
       }
     } catch (e) {
+      reset();
       setStage("error");
       setParseStatus("error");
       setError(e instanceof Error ? e.message : String(e));
@@ -307,6 +321,12 @@ export default function UploadPage() {
   }
 
   function startSavedPaper(paper: SavedPaper) {
+    if (paper.questions.length !== JEE_MAIN_CONFIG.totalQuestions) {
+      setSavedNotice(
+        `Cannot start incomplete paper (${paper.questions.length}/${JEE_MAIN_CONFIG.totalQuestions} questions). Reparse the PDF.`
+      );
+      return;
+    }
     reset();
     setQuestions(paper.questions);
     setParseStatus("complete");
@@ -584,7 +604,7 @@ export default function UploadPage() {
               ) : (
                 <button
                   onClick={handleStart}
-                  disabled={!canStart}
+                  disabled={!canParse}
                   className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {stage === "extracting" || stage === "parsing"
